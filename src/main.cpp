@@ -17,16 +17,15 @@
 #include <iostream>
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
-
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
-
 void processInput(GLFWwindow *window);
-
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
-
 unsigned int loadCubemap(vector<std::string> faces);
+unsigned int loadTexture(char const* path);
+int random(int min,int max);
+
+
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -42,6 +41,10 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+bool lightning = false;
+int br=0;
+int scale = 30;
+
 struct PointLight {
     glm::vec3 position;
     glm::vec3 ambient;
@@ -56,7 +59,7 @@ struct PointLight {
 Camera camera;
 bool CameraMouseMovementUpdateEnabled = true;
 
-glm::vec3 UFOPosition = glm::vec3(0.0f);
+glm::vec3 UFOPosition = glm::vec3(0.0f,0.0f,-15.0f);
 float UFOScale = 1.0f;
 
 int main() {
@@ -106,7 +109,7 @@ int main() {
     // -------------------------
     Shader ourShader("resources/shaders/lighting.vs", "resources/shaders/lighting.fs");
     Shader skyboxShader("resources/shaders/skybox.vs","resources/shaders/skybox.fs");
-
+    Shader blendingShader("resources/shaders/blending.vs","resources/shaders/blending.fs");
 
     // load models
     // -----------
@@ -160,6 +163,20 @@ int main() {
             1.0f, -1.0f,  1.0f
     };
 
+    //todo-------------------------
+
+    float transparentVertices[] = {
+            0.0f,0.5f,0.0f,0.0f,0.0f,
+            0.0f,-0.5f,0.0f,0.0f,1.0f,
+            1.0f,-0.5f,0.0f,1.0f,1.0f,
+
+            0.0f,0.5f,0.0f,0.0f,0.0f,
+            1.0f,-0.5f,0.0f,1.0f,1.0f,
+            1.0f,0.5f,0.0f,1.0f,0.0f
+    };
+
+    //todo-------------------------
+
     unsigned int skyboxVAO, skyboxVBO;
     glGenVertexArrays(1, &skyboxVAO);
     glGenBuffers(1, &skyboxVBO);
@@ -168,6 +185,22 @@ int main() {
     glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+    //todo-------------------------
+
+    unsigned int transparentVAO, transparentVBO;
+    glGenVertexArrays(1,&transparentVAO);
+    glGenBuffers(1,&transparentVBO);
+    glBindVertexArray(transparentVAO);
+    glBindBuffer(GL_ARRAY_BUFFER,transparentVBO);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(transparentVertices),transparentVertices,GL_STATIC_DRAW);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),(void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),(void*)(3*sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    unsigned int transparentTexture = loadTexture(FileSystem::getPath("resources/textures/lightning.png").c_str());
+    //todo-------------------------
 
     vector<std::string> faces =
             {
@@ -181,7 +214,20 @@ int main() {
 
     unsigned int cubemapTexture = loadCubemap(faces);
 
-    //----------------------------------------------------------
+
+    //todo--------------------------------------------------
+    vector<glm::vec3> coord{
+        glm::vec3(0.0f,0.0f,-50.0f),
+        glm::vec3(-12.4f,13.0f,-10.0f),
+        glm::vec3(0.0f,3.2f,-10.0f),
+        glm::vec3(-17.0f,0.0f,-10.0f),
+        glm::vec3(0.0f,-6.7f,-10.0f)
+    };
+
+    //todo------------------------------------------------
+    //---------------------------------------------------
+
+
 
     PointLight pointLight;
     pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
@@ -190,7 +236,7 @@ int main() {
     pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
 
     pointLight.constant = 1.0f;
-    pointLight.linear = 0.09f;
+    pointLight.linear = 0.08f;
     pointLight.quadratic = 0.032f;
 
 
@@ -223,10 +269,10 @@ int main() {
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
 
-
         // don't forget to enable shader before setting uniforms
         ourShader.use();
-        pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
+        //pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
+        pointLight.position = glm::vec3(0.0f,5.0f,-15.0f);
         ourShader.setVec3("pointLight.position", pointLight.position);
         ourShader.setVec3("pointLight.ambient", pointLight.ambient);
         ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
@@ -244,7 +290,7 @@ int main() {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model,
                                UFOPosition); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(UFOScale/20));    // it's a bit too big for our scene, so scale it down
+        model = glm::scale(model, glm::vec3(UFOScale/30));    // it's a bit too big for our scene, so scale it down
         model = glm::rotate(model,glm::radians(90.0f),glm::vec3(1,0,0));
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
@@ -262,6 +308,29 @@ int main() {
         glDepthFunc(GL_LESS);
 
 
+        //todo---------------------------------------------------
+
+        glDisable(GL_CULL_FACE);
+        blendingShader.use();
+        blendingShader.setMat4("view",view);
+        blendingShader.setMat4("projection",projection);
+        glBindVertexArray(transparentVAO);
+        glBindTexture(GL_TEXTURE_2D,transparentTexture);
+        //if(lightning) {
+            //for (unsigned int i = 0; i < coord.size(); i++) {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, coord[br]);
+            model = glm::scale(model, glm::vec3(scale));
+            blendingShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            br = random(0,coord.size()-1);
+            scale = random(20,50);
+            //}
+        //}
+
+
+        //todo---------------------------------------------------
+
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
@@ -270,7 +339,6 @@ int main() {
 
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
 }
@@ -289,6 +357,11 @@ void processInput(GLFWwindow *window) {
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+    if (glfwGetKey(window,GLFW_KEY_ENTER) == GLFW_PRESS)
+        br = random(0, 4);
+        lightning = true;
+    if (glfwGetKey(window,GLFW_KEY_ENTER) == GLFW_RELEASE)
+        lightning = false;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -357,4 +430,56 @@ unsigned int loadCubemap(vector<std::string> faces){
     glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE);
 
     return textureID;
+}
+
+unsigned int loadTexture(char const* path){
+    unsigned int textureID;
+    glGenTextures(1,&textureID);
+    int width, height, nrComponents;
+    unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
+    if (data)
+    {
+        GLenum format;
+        if (nrComponents == 1)
+            format = GL_RED;
+        else if (nrComponents == 3)
+            format = GL_RGB;
+        else if (nrComponents == 4)
+            format = GL_RGBA;
+
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        if(nullptr != strstr(path,"lightning.png")){
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        }
+        else{
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+        }
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+//        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT); // for this tutorial: use GL_CLAMP_TO_EDGE to prevent semi-transparent borders. Due to interpolation it takes texels from next repeat
+//        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+//        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+//        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        stbi_image_free(data);
+    }
+    else
+    {
+        std::cout << "Texture failed to load at path: " << path << std::endl;
+        stbi_image_free(data);
+    }
+
+    return textureID;
+}
+
+int random(int min,int max){
+    std::srand(glfwGetTime());
+    return min + std::rand()%(max-min+1);
 }
