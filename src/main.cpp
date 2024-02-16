@@ -41,9 +41,9 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-bool lightning = false;
 int br=0;
 int scale = 30;
+bool lightOn = false;
 
 struct PointLight {
     glm::vec3 position;
@@ -54,6 +54,21 @@ struct PointLight {
     float constant;
     float linear;
     float quadratic;
+};
+
+struct SpotLight {
+    glm::vec3 position;
+    glm::vec3 direction;
+    float cutOff;
+    float outerCutOff;
+
+    float constant;
+    float linear;
+    float quadratic;
+
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
 };
 
 Camera camera;
@@ -105,9 +120,12 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
 
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
     // build and compile shaders
     // -------------------------
-    Shader ourShader("resources/shaders/lighting.vs", "resources/shaders/lighting.fs");
+    Shader ourShader("resources/shaders/advance_lighting.vs", "resources/shaders/advance_lighting.fs");
     Shader skyboxShader("resources/shaders/skybox.vs","resources/shaders/skybox.fs");
     Shader blendingShader("resources/shaders/blending.vs","resources/shaders/blending.fs");
 
@@ -163,8 +181,6 @@ int main() {
             1.0f, -1.0f,  1.0f
     };
 
-    //todo-------------------------
-
     float transparentVertices[] = {
             0.0f,0.5f,0.0f,0.0f,0.0f,
             0.0f,-0.5f,0.0f,0.0f,1.0f,
@@ -175,8 +191,6 @@ int main() {
             1.0f,0.5f,0.0f,1.0f,0.0f
     };
 
-    //todo-------------------------
-
     unsigned int skyboxVAO, skyboxVBO;
     glGenVertexArrays(1, &skyboxVAO);
     glGenBuffers(1, &skyboxVBO);
@@ -186,7 +200,6 @@ int main() {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
-    //todo-------------------------
 
     unsigned int transparentVAO, transparentVBO;
     glGenVertexArrays(1,&transparentVAO);
@@ -200,7 +213,6 @@ int main() {
     glEnableVertexAttribArray(1);
 
     unsigned int transparentTexture = loadTexture(FileSystem::getPath("resources/textures/lightning.png").c_str());
-    //todo-------------------------
 
     vector<std::string> faces =
             {
@@ -214,17 +226,19 @@ int main() {
 
     unsigned int cubemapTexture = loadCubemap(faces);
 
-
-    //todo--------------------------------------------------
     vector<glm::vec3> coord{
-        glm::vec3(0.0f,0.0f,-50.0f),
-        glm::vec3(-12.4f,13.0f,-10.0f),
-        glm::vec3(0.0f,3.2f,-10.0f),
-        glm::vec3(-17.0f,0.0f,-10.0f),
-        glm::vec3(0.0f,-6.7f,-10.0f)
+        glm::vec3(-10.0f,2.0f,5.0f),
+        glm::vec3(10.0f,20.0f,10.0f),
+        glm::vec3(-50.0f,5.0f,-26.0f),
+        glm::vec3(-34.0f,30.0f,-72.0f),
+        glm::vec3(-10.0f,20.0f,-90.0f),
+        glm::vec3(0.0f,10.0f,-90.0f),
+        glm::vec3(0.0f,-10.0f,-90.0f),
+        glm::vec3(0.0f,0.0f,-75.0f),
+        glm::vec3(0.0f,0.0f,0.0f)
+
     };
 
-    //todo------------------------------------------------
     //---------------------------------------------------
 
 
@@ -239,6 +253,17 @@ int main() {
     pointLight.linear = 0.08f;
     pointLight.quadratic = 0.032f;
 
+    SpotLight spotLight;
+    spotLight.position = glm::vec3(UFOPosition.x,UFOPosition.y-2,UFOPosition.z);
+    spotLight.direction = glm::vec3(0,-1,0);
+    spotLight.ambient = glm::vec3(1.0f,1.0f,1.0f);
+    spotLight.diffuse = glm::vec3(0.7f,0.7f,0.7f);
+    spotLight.specular = glm::vec3(1.0f,1.0f,1.0f);
+    spotLight.constant = 0.1f;
+    spotLight.linear = 0.05f;
+    spotLight.quadratic = 0.012f;
+    spotLight.cutOff = glm::cos(glm::radians(5.5f));
+    spotLight.outerCutOff = glm::cos(glm::radians(35.0f));
 
 
     // draw in wireframe
@@ -272,7 +297,7 @@ int main() {
         // don't forget to enable shader before setting uniforms
         ourShader.use();
         //pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
-        pointLight.position = glm::vec3(0.0f,5.0f,-15.0f);
+        pointLight.position = glm::vec3(UFOPosition.x,UFOPosition.y + 3,UFOPosition.z);
         ourShader.setVec3("pointLight.position", pointLight.position);
         ourShader.setVec3("pointLight.ambient", pointLight.ambient);
         ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
@@ -280,8 +305,23 @@ int main() {
         ourShader.setFloat("pointLight.constant", pointLight.constant);
         ourShader.setFloat("pointLight.linear", pointLight.linear);
         ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
+
         ourShader.setVec3("viewPosition", camera.Position);
         ourShader.setFloat("material.shininess", 32.0f);
+
+        spotLight.position = glm::vec3(UFOPosition.x,UFOPosition.y-2,UFOPosition.z);
+        ourShader.setVec3("spotLight.position", spotLight.position);
+        ourShader.setVec3("spotLight.direction", spotLight.direction);
+        ourShader.setVec3("spotLight.ambient", spotLight.ambient);
+        ourShader.setVec3("spotLight.diffuse", spotLight.diffuse);
+        ourShader.setVec3("spotLight.specular", spotLight.specular);
+        ourShader.setFloat("spotLight.constant", spotLight.constant);
+        ourShader.setFloat("spotLight.linear", spotLight.linear);
+        ourShader.setFloat("spotLight.quadratic", spotLight.quadratic);
+        ourShader.setFloat("spotLight.cutOff", spotLight.cutOff);
+        ourShader.setFloat("spotLight.outerCutOff", spotLight.outerCutOff);
+        ourShader.setBool("lightOn",lightOn);
+
         // view/projection transformations
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
@@ -292,6 +332,7 @@ int main() {
                                UFOPosition); // translate it down so it's at the center of the scene
         model = glm::scale(model, glm::vec3(UFOScale/30));    // it's a bit too big for our scene, so scale it down
         model = glm::rotate(model,glm::radians(90.0f),glm::vec3(1,0,0));
+        model = glm::rotate(model,(float)glfwGetTime()*2,glm::vec3(0,0,-1));
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
 
@@ -308,8 +349,6 @@ int main() {
         glDepthFunc(GL_LESS);
 
 
-        //todo---------------------------------------------------
-
         glDisable(GL_CULL_FACE);
         blendingShader.use();
         blendingShader.setMat4("view",view);
@@ -324,12 +363,11 @@ int main() {
             blendingShader.setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             br = random(0,coord.size()-1);
-            scale = random(20,50);
+            scale = random(10,80);
             //}
         //}
 
-
-        //todo---------------------------------------------------
+        glEnable(GL_CULL_FACE);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -357,11 +395,33 @@ void processInput(GLFWwindow *window) {
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
-    if (glfwGetKey(window,GLFW_KEY_ENTER) == GLFW_PRESS)
-        br = random(0, 4);
-        lightning = true;
-    if (glfwGetKey(window,GLFW_KEY_ENTER) == GLFW_RELEASE)
-        lightning = false;
+    if(glfwGetKey(window,GLFW_KEY_UP)==GLFW_PRESS){
+        UFOPosition.z -= 0.3;
+    }
+    if(glfwGetKey(window,GLFW_KEY_DOWN)==GLFW_PRESS){
+        UFOPosition.z += 0.3;
+    }
+    if(glfwGetKey(window,GLFW_KEY_LEFT)==GLFW_PRESS){
+        UFOPosition.x -= 0.2;
+    }
+    if(glfwGetKey(window,GLFW_KEY_RIGHT)==GLFW_PRESS){
+        UFOPosition.x += 0.2;
+    }
+    if(glfwGetKey(window,GLFW_KEY_N)==GLFW_PRESS){
+        UFOPosition.y += 0.3;
+    }
+    if(glfwGetKey(window,GLFW_KEY_M)==GLFW_PRESS){
+        UFOPosition.y -= 0.3;
+    }
+    if(glfwGetKey(window,GLFW_KEY_O)==GLFW_PRESS){
+        lightOn = true;
+    }
+    if(glfwGetKey(window,GLFW_KEY_P)==GLFW_PRESS){
+        lightOn = false;
+    }
+
+
+
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -462,11 +522,6 @@ unsigned int loadTexture(char const* path){
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-//        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT); // for this tutorial: use GL_CLAMP_TO_EDGE to prevent semi-transparent borders. Due to interpolation it takes texels from next repeat
-//        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
-//        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-//        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         stbi_image_free(data);
     }
