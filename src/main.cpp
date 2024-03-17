@@ -1,13 +1,11 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #include <learnopengl/filesystem.h>
 #include <learnopengl/shader.h>
@@ -44,6 +42,7 @@ float lastFrame = 0.0f;
 int br=0;
 int scale = 30;
 bool lightOn = false;
+
 
 struct PointLight {
     glm::vec3 position;
@@ -111,9 +110,6 @@ int main() {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
-
-    // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
-    //stbi_set_flip_vertically_on_load(false);
 
 
     // configure global opengl state
@@ -248,7 +244,6 @@ int main() {
     pointLight.ambient = glm::vec3(0.1, 0.1, 0.1);
     pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
     pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
-
     pointLight.constant = 1.0f;
     pointLight.linear = 0.08f;
     pointLight.quadratic = 0.032f;
@@ -265,9 +260,6 @@ int main() {
     spotLight.cutOff = glm::cos(glm::radians(5.5f));
     spotLight.outerCutOff = glm::cos(glm::radians(35.0f));
 
-
-    // draw in wireframe
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     skyboxShader.use();
     skyboxShader.setInt("skybox",0);
@@ -290,6 +282,7 @@ int main() {
         // ------
         glClearColor(0.0f,0.0f,0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
@@ -355,17 +348,15 @@ int main() {
         blendingShader.setMat4("projection",projection);
         glBindVertexArray(transparentVAO);
         glBindTexture(GL_TEXTURE_2D,transparentTexture);
-        //if(lightning) {
-            //for (unsigned int i = 0; i < coord.size(); i++) {
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, coord[br]);
-            model = glm::scale(model, glm::vec3(scale));
-            blendingShader.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            br = random(0,coord.size()-1);
-            scale = random(10,80);
-            //}
-        //}
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, coord[br]);
+        model = glm::scale(model, glm::vec3(scale));
+        blendingShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        br = random(0,coord.size()-1);
+        scale = random(10,80);
+
 
         glEnable(GL_CULL_FACE);
 
@@ -375,6 +366,12 @@ int main() {
         glfwPollEvents();
     }
 
+
+
+    glDeleteVertexArrays(1, &transparentVAO);
+    glDeleteVertexArrays(1, &skyboxVAO);
+    glDeleteBuffers(1, &transparentVBO);
+    glDeleteBuffers(1, &skyboxVBO);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     glfwTerminate();
@@ -510,16 +507,8 @@ unsigned int loadTexture(char const* path){
         glBindTexture(GL_TEXTURE_2D, textureID);
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
-
-        if(nullptr != strstr(path,"lightning.png")){
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-        }
-        else{
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
-        }
-
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
