@@ -16,8 +16,7 @@
 
 ## **SLIKE**
 
-![](/home/matf-racunarska-grafika/Downloads/2.png)
-![](/home/matf-racunarska-grafika/Downloads/3.png)
-
+![](/home/matf-racunarska-grafika/Desktop/rg_projekat/grafika/2.png)
+![](/home/matf-racunarska-grafika/Desktop/rg_projekat/grafika/3.png)
 
 
