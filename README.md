@@ -14,9 +14,5 @@
 
 #### **ESC** - izlazak iz programa        
 
-## **SLIKE**
-
-![](/home/matf-racunarska-grafika/Desktop/rg_projekat/grafika/2.png)
-![](/home/matf-racunarska-grafika/Desktop/rg_projekat/grafika/3.png)
 
 
